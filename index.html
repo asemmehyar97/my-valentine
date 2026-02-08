@@ -5,16 +5,21 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Will you be my Valentine?</title>
 
-  <!-- Confetti library -->
+  <!-- Libraries -->
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;700&family=Quicksand:wght@300;500;700&display=swap" rel="stylesheet">
 
   <style>
     :root {
-      --bg1: #ffd6e7;
-      --bg2: #ffeef6;
-      --card: #ffffffcc;
-      --yes: #ff3b7a;
-      --yesHover: #ff1f68;
+      --bg-grad: linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%);
+      /* Ultra-low alpha for maximum visibility of background cloud */
+      --glass: rgba(255, 255, 255, 0.03); 
+      --yes-color: #ff3b7a;
+      --text-main: #2D2D44;
+      --meter-bg: rgba(255, 255, 255, 0.1);
     }
 
     * { box-sizing: border-box; }
@@ -22,284 +27,500 @@
     body {
       margin: 0;
       min-height: 100svh;
-      display: grid;
-      place-items: center;
-      background: radial-gradient(circle at top, var(--bg2), var(--bg1));
-      font-family: system-ui, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: var(--bg-grad);
+      font-family: 'Quicksand', sans-serif;
       overflow: hidden;
       padding: 16px;
     }
 
-    /* FULL-SCREEN CONFETTI CANVAS */
-    #confettiCanvas {
+    /* Floating Background Layer */
+    .bg-layer {
       position: fixed;
       inset: 0;
-      width: 100vw;
-      height: 100vh;
       pointer-events: none;
-      z-index: 9999;
+      z-index: 0;
+    }
+
+    .floating-el {
+      position: absolute;
+      white-space: nowrap;
+      user-select: none;
+      animation: float 20s infinite ease-in-out;
+      transition: opacity 2s ease, transform 2s ease, color 2s ease;
+    }
+
+    .floating-text {
+      font-family: 'Caveat', cursive;
+      font-weight: 700;
+      opacity: 0.7;
+      color: #fff;
+    }
+
+    .floating-emoji {
+      opacity: 0.6;
+      font-size: 2.2em;
     }
 
     .card {
-      width: min(720px, 92vw);
-      padding: 26px 22px;
-      background: var(--card);
-      backdrop-filter: blur(10px);
-      border-radius: 22px;
+      width: min(560px, 95vw);
+      padding: 40px 20px;
+      background: var(--glass);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      border-radius: 40px;
       text-align: center;
-      box-shadow: 0 18px 60px rgba(0,0,0,.15);
+      box-shadow: 0 30px 60px rgba(0,0,0,0.03);
+      position: relative;
+      z-index: 10;
+      border: 1px solid rgba(255,255,255,0.1);
+      transition: all 0.5s ease;
     }
 
-    .art {
-      width: min(260px, 80vw);
-      margin: 0 auto 10px;
-      display: block;
-      filter: drop-shadow(0 10px 14px rgba(0,0,0,.12));
+    .art-container {
+      font-size: clamp(60px, 15vw, 85px);
+      margin-bottom: 15px;
+      animation: bounce 2.5s infinite ease-in-out;
     }
 
-    h1 {
-      font-size: clamp(26px, 4vw, 44px);
-      margin: 12px 0 18px;
+    .header-style {
+      font-family: 'Caveat', cursive;
+      font-size: clamp(38px, 9vw, 52px);
+      color: var(--text-main);
+      margin: 0 0 15px;
+      line-height: 1.1;
+      font-weight: 700;
+    }
+
+    /* Translator Bubble */
+    #translator {
+      font-family: 'Caveat', cursive;
+      font-size: 1.3em;
+      color: var(--yes-color);
+      height: 30px;
+      margin-bottom: 10px;
+      font-weight: bold;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    .meter-label {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      margin-bottom: 8px;
+      color: #4A4A6A;
+      opacity: 0.9;
+    }
+
+    .meter-container {
+      width: 65%;
+      height: 8px;
+      background: var(--meter-bg);
+      border-radius: 10px;
+      margin: 0 auto 15px;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .meter-fill {
+      width: 0%;
+      height: 100%;
+      background: var(--yes-color);
+      transition: width 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    #overload-alert {
+      background: rgba(255, 59, 122, 0.2);
+      border: 1px solid var(--yes-color);
+      color: #7f1d1d;
+      padding: 10px;
+      border-radius: 12px;
+      font-size: 0.8em;
+      font-weight: 700;
+      margin-bottom: 20px;
+      display: none;
+      animation: shake 0.5s ease;
     }
 
     .button-zone {
       position: relative;
-      width: min(520px, 92%);
-      height: 150px;
+      height: 180px;
+      width: 100%;
       margin: 0 auto;
       touch-action: none;
     }
 
     button {
-      position: absolute;
-      top: 50%;
-      transform: translateY(-50%);
-      padding: 16px 24px;
-      font-size: 18px;
-      font-weight: 800;
-      border-radius: 999px;
+      padding: 16px 36px;
+      font-size: 20px;
+      font-weight: 700;
+      border-radius: 60px;
       border: none;
       cursor: pointer;
-      box-shadow: 0 10px 24px rgba(0,0,0,.14);
-      user-select: none;
+      box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+      transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      position: absolute;
       -webkit-tap-highlight-color: transparent;
-      transition: transform .12s ease, background .12s ease;
+      font-family: 'Quicksand', sans-serif;
     }
 
     #yesBtn {
-      left: 18%;
-      background: var(--yes);
-      color: #fff;
+      background: var(--yes-color);
+      color: white;
+      left: 50%;
+      top: 30%;
+      transform: translate(-50%, -50%);
+      z-index: 20;
     }
-    #yesBtn:hover { background: var(--yesHover); }
 
     #noBtn {
-      left: 62%;
-      background: #e5e7eb;
-      color: #111827;
+      background: rgba(255, 255, 255, 0.95);
+      color: #94a3b8;
+      left: 50%;
+      top: 80%;
+      transform: translate(-50%, -50%);
+      font-size: 18px;
     }
 
-    .hint {
-      margin-top: 10px;
-      font-size: 13px;
-      opacity: .7;
+    .message-pop {
+      position: fixed;
+      pointer-events: none;
+      font-family: 'Caveat', cursive;
+      color: #ff3b7a;
+      font-size: 1.6em;
+      font-weight: bold;
+      animation: fadeUp 2s forwards;
+      z-index: 100;
     }
 
-    .result {
+    #result, #contract {
       display: none;
-      margin-top: 18px;
-      animation: pop .35s ease;
+      animation: popIn 0.7s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     }
 
-    .result h2 {
-      font-size: clamp(30px, 4.5vw, 46px);
-      margin: 10px 0;
+    .contract-box {
+      background: rgba(255, 255, 255, 0.3);
+      border: 2px dashed var(--yes-color);
+      padding: 25px;
+      border-radius: 20px;
+      margin-top: 20px;
+      text-align: left;
+      font-size: 0.95em;
+      color: #333;
+      position: relative;
+      overflow: hidden;
+      min-height: 250px;
     }
 
-    .fireworks {
-      width: min(380px, 90vw);
-      margin: 0 auto;
+    .contract-header {
+      font-family: 'Caveat', cursive;
+      font-size: 2em;
+      text-align: center;
+      margin-bottom: 12px;
+      color: var(--yes-color);
+    }
+
+    .contract-heart {
+      font-size: 45px;
+      cursor: pointer;
       display: block;
+      margin: 20px auto 0;
+      transition: transform 0.2s;
+      -webkit-tap-highlight-color: transparent;
     }
 
-    @keyframes pop {
-      from { transform: scale(.96); opacity: 0; }
-      to { transform: scale(1); opacity: 1; }
+    /* The Stamp - Positioned at bottom */
+    #notary-stamp {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translate(-50%, 0) scale(5);
+      font-weight: 900;
+      color: rgba(185, 28, 28, 0.9);
+      border: 4px solid rgba(185, 28, 28, 0.9);
+      padding: 8px 15px;
+      text-transform: uppercase;
+      font-family: 'Quicksand', sans-serif;
+      border-radius: 8px;
+      opacity: 0;
+      pointer-events: none;
+      z-index: 50;
+      transform-origin: center;
+      background: rgba(255,255,255,0.1);
+      line-height: 1;
+      width: fit-content;
+      white-space: nowrap;
+    }
+
+    .stamp-animate {
+      animation: stampDrop 0.4s cubic-bezier(0.6, -0.28, 0.735, 0.045) forwards;
+    }
+
+    .romantic-text {
+      font-size: 1.15em;
+      color: #4a4a6a;
+      line-height: 1.6;
+      margin: 20px 0;
+      font-weight: 500;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translate(0, 0) rotate(0deg); }
+      33% { transform: translate(45px, -35px) rotate(5deg); }
+      66% { transform: translate(-35px, 30px) rotate(-5deg); }
+    }
+
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-15px); }
+    }
+
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-8px); }
+      75% { transform: translateX(8px); }
+    }
+
+    @keyframes stampDrop {
+      0% { transform: translate(-50%, 0) scale(5); opacity: 0; }
+      100% { transform: translate(-50%, 0) scale(1.1) rotate(-8deg); opacity: 1; }
+    }
+
+    @keyframes fadeUp {
+      0% { opacity: 0; transform: translateY(20px); }
+      15% { opacity: 1; transform: translateY(0); }
+      100% { opacity: 0; transform: translateY(-80px); }
+    }
+
+    @keyframes popIn {
+      0% { transform: scale(0.6); opacity: 0; }
+      100% { transform: scale(1); opacity: 1; }
     }
   </style>
 </head>
 
 <body>
-  <canvas id="confettiCanvas"></canvas>
+  <div class="bg-layer" id="bgLayer"></div>
 
-  <main class="card">
-    <!-- ANIMAL WITH HEART -->
-    <svg class="art" viewBox="0 0 320 240" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <linearGradient id="fur" x1="0" x2="1">
-          <stop offset="0" stop-color="#f7c7a1"/>
-          <stop offset="1" stop-color="#f2a97b"/>
-        </linearGradient>
-        <linearGradient id="heart" x1="0" x2="1">
-          <stop offset="0" stop-color="#ff4d7d"/>
-          <stop offset="1" stop-color="#ff1f68"/>
-        </linearGradient>
-      </defs>
+  <main class="card" id="mainCard">
+    <div id="interaction">
+      <div class="art-container">🧸❤️</div>
+      <h1 class="header-style">Nadeen, will you be my Valentine?</h1>
 
-      <path d="M250 50 C250 33 270 25 282 38
-               C294 25 314 33 314 50
-               C314 78 282 92 282 106
-               C282 92 250 78 250 50Z"
-            fill="url(#heart)"/>
+      <div id="translator">Calculating...</div>
 
-      <path d="M90 120 C90 70 140 40 190 60
-               C240 40 290 70 290 120
-               C290 180 240 210 190 210
-               C140 210 90 180 90 120Z"
-            fill="url(#fur)"/>
+      <div class="meter-label">Stubbornness Level</div>
+      <div class="meter-container">
+        <div class="meter-fill" id="stubbornFill"></div>
+      </div>
+      
+      <div id="overload-alert">
+        ERROR: System overload. Only 'Yes' is permitted for a girl this cute.
+      </div>
 
-      <path d="M110 92 L95 55 L140 78 Z" fill="#f2a97b"/>
-      <path d="M270 92 L285 55 L240 78 Z" fill="#f2a97b"/>
+      <div class="button-zone" id="zone">
+        <button id="yesBtn">Yes!</button>
+        <button id="noBtn">No</button>
+      </div>
+    </div>
 
-      <circle cx="160" cy="130" r="8"/>
-      <circle cx="220" cy="130" r="8"/>
+    <div id="result">
+      <div class="art-container">🥰✨</div>
+      <h2 class="header-style">I love you!</h2>
+      <p class="romantic-text">
+        You are my favorite human and my greatest blessing. 
+        Thank you for being exactly who you are. 
+        I cant wait for many more valentines with you.
+      </p>
+      <button onclick="showContract()" style="position: static; transform: none; display: inline-block; background: #8C6AEE; color: white; margin-top: 10px; font-size: 16px;">
+        View our Contract
+      </button>
+    </div>
 
-      <path d="M190 144 C186 144 182 148 182 152
-               C182 160 190 164 190 170
-               C190 164 198 160 198 152
-               C198 148 194 144 190 144Z"
-            fill="#ff7aa2"/>
-    </svg>
+    <div id="contract">
+      <div class="contract-box">
+        <div class="contract-header">Official Receipt of Consent</div>
+        <p><b>Parties:</b> Asem & Nadeen</p>
+        <p><b>Clause 1:</b> This agreement is valid for eternity.</p>
+        <p><b>Clause 2:</b> Includes unlimited hugs and make out sessions.</p>
+        <p><b>Clause 3:</b> No returns, no exchanges. You're stuck with me.</p>
+        
+        <div id="notary-stamp">YOURS, NADEEN MAKHZOUMI</div>
 
-    <h1>nirali will you be my valentine?</h1>
-
-    <section class="button-zone" id="zone">
-      <button id="yesBtn">Yes</button>
-      <button id="noBtn">No</button>
-    </section>
-
-    <!-- HINT -->
-    <div class="hint" id="hint">“No” seems a bit shy 😈</div>
-
-    <section class="result" id="result">
-      <h2>YAY! 🎉</h2>
-      <img
-        class="fireworks"
-        src="https://media.giphy.com/media/26ufdipQqU2lhNA4g/giphy.gif"
-        alt="Fireworks"
-      />
-    </section>
+        <hr style="border: 0; border-top: 1px solid rgba(0,0,0,0.1); margin: 30px 0 10px;">
+        <p style="text-align:center; font-style:italic; font-size: 0.85em; color: var(--yes-color);">Tap the heart to sign officially</p>
+        <span class="contract-heart" id="sealContract">❤️</span>
+      </div>
+    </div>
   </main>
 
   <script>
-    const zone = document.getElementById("zone");
+    const bgLayer = document.getElementById("bgLayer");
     const yesBtn = document.getElementById("yesBtn");
     const noBtn = document.getElementById("noBtn");
-    const result = document.getElementById("result");
-    const hint = document.getElementById("hint");
+    const zone = document.getElementById("zone");
+    const stubbornFill = document.getElementById("stubbornFill");
+    const overloadAlert = document.getElementById("overload-alert");
+    const translator = document.getElementById("translator");
 
-    /* ---------- CONFETTI ---------- */
-    const confettiCanvas = document.getElementById("confettiCanvas");
-
-    function resizeConfettiCanvas() {
-      const dpr = Math.max(1, window.devicePixelRatio || 1);
-      confettiCanvas.width = Math.floor(window.innerWidth * dpr);
-      confettiCanvas.height = Math.floor(window.innerHeight * dpr);
-      confettiCanvas.style.width = "100vw";
-      confettiCanvas.style.height = "100vh";
+    // DYNAMIC BACKGROUND GENERATOR
+    function createBackground() {
+      const phrases = ["Valentine...", "bamoot feki!"];
+      const emojis = ["❤️", "💖", "🧸", "✨", "🥰", "🌸", "🧸", "🧸"];
+      
+      for(let i=0; i<75; i++) {
+        const el = document.createElement('div');
+        const isEmoji = i > 35; 
+        
+        if(isEmoji) {
+          el.className = 'floating-el floating-emoji';
+          el.textContent = emojis[Math.floor(Math.random() * emojis.length)];
+        } else {
+          el.className = 'floating-el floating-text';
+          el.textContent = phrases[i % 2];
+          el.style.fontSize = '2.1em';
+        }
+        
+        const row = Math.floor(i / 10);
+        const col = i % 10;
+        el.style.top = (row * 10 + Math.random() * 8) + '%';
+        el.style.left = (col * 10 + Math.random() * 8) + '%';
+        el.style.animationDelay = (Math.random() * -20) + 's';
+        bgLayer.appendChild(el);
+      }
     }
 
-    resizeConfettiCanvas();
-    window.addEventListener("resize", resizeConfettiCanvas);
-    window.addEventListener("orientationchange", () => setTimeout(resizeConfettiCanvas, 150));
+    createBackground();
 
-    const confettiInstance = confetti.create(confettiCanvas, {
-      resize: false,
-      useWorker: true
-    });
-
-    function fullScreenConfetti() {
-      const end = Date.now() + 1600;
-
-      (function frame() {
-        confettiInstance({
-          particleCount: 12,
-          spread: 90,
-          startVelocity: 45,
-          ticks: 180,
-          origin: { x: Math.random(), y: Math.random() * 0.3 }
-        });
-        if (Date.now() < end) requestAnimationFrame(frame);
-      })();
-
-      setTimeout(() => {
-        confettiInstance({
-          particleCount: 300,
-          spread: 140,
-          startVelocity: 60,
-          ticks: 220,
-          origin: { x: 0.5, y: 0.55 }
-        });
-      }, 300);
+    // REASON CLOUD REVEAL
+    function revealReasons() {
+      const reasons = ["Your laugh", "Your mind", "Your soul", "Your style", "Your lips", "Your touch", "Your heart"];
+      const textEls = document.querySelectorAll('.floating-text');
+      textEls.forEach((el, index) => {
+        el.style.opacity = '0';
+        setTimeout(() => {
+          el.textContent = reasons[index % reasons.length];
+          el.style.color = '#e11d48'; // Deep Red color for the Reason Cloud
+          el.style.opacity = '0.9';
+          el.style.transform = 'scale(1.3)';
+        }, 1500);
+      });
     }
 
-    /* ---------- YES BUTTON GROWS ---------- */
+    function triggerHaptic(type) {
+      if (window.navigator && window.navigator.vibrate) {
+        if (type === 'no') {
+          window.navigator.vibrate(50); // Short tap for "No" move
+        } else if (type === 'yes') {
+          window.navigator.vibrate([100, 50, 100]); // Pulsing vibration for "Yes"
+        } else if (type === 'stamp') {
+          window.navigator.vibrate(200); // Heavy pulse for Stamp
+        }
+      }
+    }
+
     let yesScale = 1;
-    function growYes() {
-      yesScale = Math.min(2.2, yesScale + 0.1);
-      yesBtn.style.transform = `translateY(-50%) scale(${yesScale})`;
+    let noAttempts = 0;
+    const noPhrases = ["Sorry, try again 😜", "Your resistance is cute ❤️"];
+    const logicPhrases = {
+      1: "Detecting a minor coordination error...",
+      3: "Is the screen a bit blurry, baby?",
+      5: "Maybe try using your other hand?",
+      7: "The 'No' button is broken. Disabling it."
+    };
+
+    function moveNo(e) {
+      const currentPhrase = noPhrases[noAttempts % 2];
+      noAttempts++;
+      
+      triggerHaptic('no');
+
+      // Update Translator
+      if(logicPhrases[noAttempts]) {
+        translator.textContent = logicPhrases[noAttempts];
+        translator.style.opacity = 1;
+      }
+
+      // Update Meter - 7 attempts
+      const fillPercent = Math.min((noAttempts / 7) * 100, 100);
+      stubbornFill.style.width = fillPercent + '%';
+
+      if(fillPercent === 100) {
+        overloadAlert.style.display = 'block';
+      }
+
+      // Growth
+      yesScale += 0.1; 
+      yesBtn.style.transform = `translate(-50%, -50%) scale(${yesScale})`;
+
+      const zoneRect = zone.getBoundingClientRect();
+      const noRect = noBtn.getBoundingClientRect();
+      const maxX = zoneRect.width - noRect.width;
+      const maxY = zoneRect.height - noRect.height;
+
+      noBtn.style.left = `${Math.random() * maxX + noRect.width/2}px`;
+      noBtn.style.top = `${Math.random() * maxY + noRect.height/2}px`;
+
+      const clientX = e.clientX || (e.touches ? e.touches[0].clientX : window.innerWidth/2);
+      const clientY = e.clientY || (e.touches ? e.touches[0].clientY : window.innerHeight/2);
+
+      const msg = document.createElement('div');
+      msg.className = 'message-pop';
+      msg.textContent = currentPhrase;
+      msg.style.left = `${clientX}px`;
+      msg.style.top = `${clientY}px`;
+      document.body.appendChild(msg);
+      setTimeout(() => msg.remove(), 1500);
     }
 
-    /* ---------- NO BUTTON RUNS AWAY ---------- */
-    function clamp(n, min, max) {
-      return Math.max(min, Math.min(max, n));
-    }
+    noBtn.addEventListener("mouseover", moveNo);
+    noBtn.addEventListener("touchstart", (e) => { e.preventDefault(); moveNo(e.touches[0]); });
 
-    function moveNo(px, py) {
-      const z = zone.getBoundingClientRect();
-      const b = noBtn.getBoundingClientRect();
-
-      let dx = (b.left + b.width / 2) - px;
-      let dy = (b.top + b.height / 2) - py;
-      let mag = Math.hypot(dx, dy) || 1;
-      dx /= mag;
-      dy /= mag;
-
-      let newLeft = (b.left - z.left) + dx * 150;
-      let newTop  = (b.top - z.top) + dy * 150;
-
-      newLeft = clamp(newLeft, 0, z.width - b.width);
-      newTop  = clamp(newTop, 0, z.height - b.height);
-
-      noBtn.style.left = newLeft + "px";
-      noBtn.style.top = newTop + "px";
-      noBtn.style.transform = "none";
-
-      growYes();
-    }
-
-    zone.addEventListener("pointermove", e => {
-      const b = noBtn.getBoundingClientRect();
-      const d = Math.hypot(
-        (b.left + b.width / 2) - e.clientX,
-        (b.top + b.height / 2) - e.clientY
-      );
-      if (d < 140) moveNo(e.clientX, e.clientY);
+    yesBtn.addEventListener("click", () => {
+      triggerHaptic('yes');
+      document.getElementById("interaction").style.display = "none";
+      document.getElementById('result').style.display = "block";
+      revealReasons();
+      triggerConfetti();
     });
 
-    noBtn.addEventListener("click", e => e.preventDefault());
+    function triggerConfetti() {
+      const end = Date.now() + 5000;
+      (function frame() {
+        confetti({ particleCount: 4, angle: 60, spread: 60, origin: { x: 0 }, colors: ['#ff3b7a', '#ffffff'] });
+        confetti({ particleCount: 4, angle: 120, spread: 60, origin: { x: 1 }, colors: ['#ff3b7a', '#ffffff'] });
+        if (Date.now() < end) requestAnimationFrame(frame);
+      }());
+    }
 
-    /* ---------- YES CLICK ---------- */
-    yesBtn.addEventListener("click", () => {
-      zone.style.display = "none";
-      hint.style.display = "none";     // HIDE THE HINT
-      result.style.display = "block";
-      resizeConfettiCanvas();
-      fullScreenConfetti();
+    function showContract() {
+      document.getElementById('result').style.display = "none";
+      document.getElementById('contract').style.display = "block";
+    }
+
+    document.getElementById('sealContract').addEventListener('click', function() {
+      triggerHaptic('stamp');
+      const stamp = document.getElementById('notary-stamp');
+      stamp.classList.add('stamp-animate');
+      
+      this.textContent = '💖';
+      this.style.transform = 'scale(1.4)';
+      
+      triggerConfetti();
+      
+      const msg = document.createElement('div');
+      msg.className = 'message-pop';
+      msg.textContent = "SEALED FOREVER! ❤️";
+      msg.style.left = '50%';
+      msg.style.top = '20%';
+      msg.style.transform = 'translateX(-50%)';
+      document.body.appendChild(msg);
+      setTimeout(() => msg.remove(), 3000);
     });
   </script>
 </body>
 </html>
-
-
-
